@@ -123,6 +123,12 @@ class Module extends BaseModule
      */
     public $passwordRecoveryRedirect = NULL;
 
+    /**
+     * User identity class
+     * @var Da\User\Model\User
+     */
+    public $identityClass = User::class;
+
     private static $mapUserARtoLDAPattr = [
         'sn' => 'username',
         'uid' => 'username',
@@ -234,10 +240,10 @@ class Module extends BaseModule
             if (empty($username)) {
                 $username = $username_inserted;
             }
-            $user = User::findOne(['username' => $username]);
+            $user = $this->identityClass::findOne(['username' => $username]);
             if (empty($user)) {
                 if ($this->createLocalUsers) {
-                    $user = new User();
+                    $user = new $this->identityClass();
                     $user->username = $username;
                     $user->password = uniqid();
                     // Gets the email from the ldap user
@@ -267,10 +273,10 @@ class Module extends BaseModule
                     // Triggers the EVENT_AFTER_CREATE event
                     $user->trigger(UserEvent::EVENT_AFTER_CREATE, new UserEvent($user));
                 } else {
-                    $user = User::findOne($this->defaultUserId);
+                    $user = $this->identityClass::findOne($this->defaultUserId);
                     if (empty($user)) {
                         // The default User wasn't found, it has to be created
-                        $user = new User();
+                        $user = new $this->identityClass();
                         $user->id = $this->defaultUserId;
                         $user->email = "default@user.com";
                         $user->confirmed_at = time();
@@ -294,7 +300,7 @@ class Module extends BaseModule
             }
 
             // Now I have a valid user which passed LDAP authentication, lets login it
-            $userIdentity = User::findIdentity($user->id);
+            $userIdentity = $this->identityClass::findIdentity($user->id);
             $duration = $form->rememberMe ? $form->module->rememberLoginLifespan : 0;
             Yii::$app->getUser()->login($userIdentity, $duration);
             Yii::info("Utente '{$user->username}' accesso LDAP eseguito con successo", "ACCESSO_LDAP");
@@ -331,7 +337,7 @@ class Module extends BaseModule
                 $ldapUser = $this->findLdapUser($username, 'cn');
             } catch (NoLdapUserException $e) {
                 $password = $form->password;
-                $user = User::findOne(['username' => $username]);
+                $user = $this->identityClass::findOne(['username' => $username]);
                 $user->password = $password;
                 $this->createLdapUser($user);
             }
